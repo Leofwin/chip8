@@ -15,7 +15,7 @@ class Screen:
         if x >= self.width or y >= self.height or x < 0 or y < 0:
             raise InvalidCoordinatesException()
 
-        index = y * self.height + x
+        index = self._get_index(x, y)
         if index >= self.size:
             raise InvalidCoordinatesException()
 
@@ -23,6 +23,10 @@ class Screen:
             raise ValueError("Value can be only 0 or 1")
 
         self._screen[index] = value
+
+    def get_value(self, x, y):
+        index = self._get_index(x, y)
+        return self._screen[index]
 
     @staticmethod
     def decode_byte_to_pixels(byte):
@@ -40,7 +44,7 @@ class Screen:
     def _get_index(self, x, y):
         if x < 0 or y < 0 or x > self.width or y > self.height:
             raise InvalidCoordinatesException()
-        result = y * self.height + x
+        result = y * self.width + x
         if result >= self.size:
             raise InvalidCoordinatesException()
         return result
@@ -51,7 +55,9 @@ class Screen:
             pixels = Screen.decode_byte_to_pixels(byte)
 
             for x_offset, pixel in enumerate(pixels):
-                index = self._get_index(x + x_offset, y + y_offset)
+                screen_x = (x + x_offset) % self.width
+                screen_y = (y + y_offset) % self.height
+                index = self._get_index(screen_x, screen_y)
                 collision |= bool(self._screen[index] & pixel)
                 self._screen[index] ^= pixel
 

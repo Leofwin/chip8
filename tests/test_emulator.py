@@ -113,7 +113,7 @@ class EmulatorTest(unittest.TestCase):
         vy = 0xb
         value = 0xaaa
         self.chip_emulator.registers[vy] = value
-        self.chip_emulator._op_0x8(vx, vy)
+        self.chip_emulator._op_0x8xy0(vx, vy)
         self.assertEqual(value, self.chip_emulator.registers[vy])
 
 

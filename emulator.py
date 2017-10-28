@@ -36,7 +36,8 @@ class Emulator:
             0x7: self._op_0x7,
             0x1: self._op_0x1,
             0x6: self._op_0x6,
-            0x8: self._op_0x8
+            0x8008: self._op_0x8xy0,
+            0x2: self._op_0x2
         }
 
     def load_file_in_memory(self, file_name):
@@ -76,13 +77,14 @@ class Emulator:
     def parse_word(word):
         opcode = word >> 12
         args = []
-        if opcode in {0xA, 0x1}:
+        if opcode in {0xA, 0x1, 0x2}:
             args.append(word & 0x0FFF)
         elif opcode == 0xD:
             for offset in range(2, -1, -1):
                 mask = 0x000f << (offset * 4)
                 args.append((word & mask) >> (offset * 4))
         elif opcode == 0x8:
+            opcode = word & 0xF00F
             for offset in range(2, 0, -1):
                 mask = 0x000f << (offset * 4)
                 args.append((word & mask) >> (offset * 4))
@@ -97,7 +99,7 @@ class Emulator:
         self.register_i = address
 
     def _op_0xc(self, register, byte):
-        self.registers[register] = random.randint(0, 255) & byte
+        self.registers[register] = random.randint(0, 0xFF) & byte
 
     def _op_0x3(self, register, byte):
         if self.registers[register] == byte:
@@ -119,7 +121,7 @@ class Emulator:
     def _op_0x6(self, vx, number):
         self.registers[vx] = number
 
-    def _op_0x8(self, vx, vy):
+    def _op_0x8xy0(self, vx, vy):
         self.registers[vx] = self.registers[vy]
 
     def _op_0x2(self, address):
