@@ -47,13 +47,27 @@ class Emulator:
             0xF065: self._op_0xf_65
         }
 
+    def reset(self):
+        self.memory = memory.Memory()
+        self.screen.reset()
+        self.registers = bytearray(16)
+
+        self.stack = []
+        self.stack_counter = 0
+        self.memory_pointer = 0x200
+        self.register_i = 0x200
+        self.delay_timer = 0
+        self.sound_timer = 0
+
+        self.is_waiting_mode = False
+        self.pressed_button = None
+
     def load_file_in_memory(self, file_name):
-        file_path = settings.games_folder + file_name
         try:
-            with open(file_path, 'rb') as f:
+            with open(file_name, 'rb') as f:
                 data = f.read()
         except Exception:
-            raise BlockingIOError("Can't read a file {}".format(file_path))
+            raise BlockingIOError("Can't read a file {}".format(file_name))
 
         self.memory.load_data(self.memory_pointer, data)
 

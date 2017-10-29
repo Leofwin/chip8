@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QMainWindow, QAction, QApplication, QFrame, QLabel
+import PyQt5.QtWidgets
 from PyQt5.QtGui import QKeySequence
 from PyQt5.QtCore import QBasicTimer
 import settings
@@ -6,7 +6,7 @@ import emulator
 import sys
 
 
-class EmulatorWindow(QMainWindow):
+class EmulatorWindow(PyQt5.QtWidgets.QMainWindow):
     def __init__(self, parent_emulator, parent=None):
         super().__init__(parent)
 
@@ -25,16 +25,21 @@ class EmulatorWindow(QMainWindow):
         menu_file = menubar.addMenu("&File")
         menu_help = menubar.addMenu("&Help")
 
-        open = QAction("Open", self)
-        open.setShortcut(QKeySequence("Ctrl+O"))
-        open.triggered.connect(self.load_file)
+        open_act = PyQt5.QtWidgets.QAction("Open", self)
+        open_act.setShortcut(QKeySequence("Ctrl+O"))
+        open_act.triggered.connect(self.load_file)
 
-        about = QAction("About", self)
-        about.setShortcut(QKeySequence("Ctrl+H"))
-        about.triggered.connect(self.show_help)
+        about_act = PyQt5.QtWidgets.QAction("About", self)
+        about_act.setShortcut(QKeySequence("Ctrl+H"))
+        about_act.triggered.connect(self.show_help)
 
-        menu_file.addAction(open)
-        menu_help.addAction(about)
+        quit_act = PyQt5.QtWidgets.QAction("Quit", self)
+        quit_act.setShortcut(QKeySequence("Ctrl+Q"))
+        quit_act.triggered.connect(self.close)
+
+        menu_file.addAction(open_act)
+        menu_file.addAction(quit_act)
+        menu_help.addAction(about_act)
 
     def timerEvent(self, e):
         self.emulator.make_tact()
@@ -46,13 +51,38 @@ class EmulatorWindow(QMainWindow):
             self.emulator.pressed_button = settings.key_codes[key_code]
 
     def load_file(self):
-        pass
+        name = PyQt5.QtWidgets.QFileDialog.getOpenFileName(
+            self, 'Загрузить файл', settings.games_folder,
+            "All Files (*)")
+        if name == ('', ''):
+            return
+
+        try:
+            self.emulator.reset()
+            self.emulator.load_file_in_memory(name[0])
+            self.screen.update_pixels()
+        except Exception as e:
+            print(e)
+            PyQt5.QtWidgets.QMessageBox.critical(
+                self,
+                "Не удалось загрузить файл",
+                "Не удалось загрузить файл. "
+                "Проверьте существование файла или"
+                "обратитесь к разработчику проекта",
+                PyQt5.QtWidgets.QMessageBox.Close)
+
 
     def show_help(self):
+        PyQt5.QtWidgets.QMessageBox.information(
+            self, "About", settings.help_msg,
+            PyQt5.QtWidgets.QMessageBox.Ok
+        )
+
+    def restart(self):
         pass
 
 
-class Screen(QFrame):
+class Screen(PyQt5.QtWidgets.QFrame):
     def __init__(self, screen_data, parent=None):
         super().__init__(parent)
 
@@ -84,7 +114,7 @@ class Screen(QFrame):
                     self.points[index].update_color(value)
 
 
-class Pixel(QLabel):
+class Pixel(PyQt5.QtWidgets.QLabel):
     def __init__(self, x, y, value, parent=None):
         super().__init__(parent)
         self.value = None
@@ -106,9 +136,9 @@ class Pixel(QLabel):
 
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
+    app = PyQt5.QtWidgets.QApplication(sys.argv)
     chip_emulator = emulator.Emulator()
-    chip_emulator.load_file_in_memory("MAZE")
+    chip_emulator.load_file_in_memory(settings.games_folder + "MAZE")
 
     window = EmulatorWindow(chip_emulator)
     window.show()

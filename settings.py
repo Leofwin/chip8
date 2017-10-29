@@ -6,6 +6,8 @@ log_file = "log.log"
 window_title = "CHIP-8"
 frequency = 1
 pixel_size = 12
+help_msg = '''CHIP-8 Emulator (версия 0.3)
+           Автор: Чуприлин Андрей <leofwin98@yandex.ru>'''
 
 # blue colors
 # active_color = "#D2D4E0"
@@ -18,6 +20,10 @@ active_color = "#AA967E"
 # corall colors
 # active_color = "#FE0002"
 # background_color = "#FFCB99"
+
+# standart colors
+# active_color = "#008000"
+# background_color = "#000000"
 
 ''' 
 CHIP:		PC:

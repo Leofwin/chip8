@@ -28,6 +28,9 @@ class Screen:
         index = self._get_index(x, y)
         return self._screen[index]
 
+    def reset(self):
+        self._screen = bytearray(self.size)
+
     @staticmethod
     def decode_byte_to_pixels(byte):
         if byte < 0x0 or byte > 0xff:
