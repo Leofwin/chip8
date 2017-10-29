@@ -40,6 +40,11 @@ class EmulatorWindow(QMainWindow):
         self.emulator.make_tact()
         self.screen.update_pixels()
 
+    def keyPressEvent(self, e):
+        key_code = e.key()
+        if key_code in settings.key_codes.keys():
+            self.emulator.pressed_button = settings.key_codes[key_code]
+
     def load_file(self):
         pass
 
