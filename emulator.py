@@ -19,6 +19,7 @@ class Emulator:
         self.stack_counter = 0
         self.memory_pointer = 0x200
         self.register_i = 0x200
+
         self.delay_timer = 0
         self.sound_timer = 0
 
@@ -129,6 +130,10 @@ class Emulator:
 
         self.instructions[opcode](*args)
 
+        if self.delay_timer > 0:
+            self.delay_timer -= 1
+        if self.sound_timer > 0:
+            self.sound_timer -= 1
         # if not keypress waiting mode,
         # increase memory pointer to all commands except commands
         # which are changing memory pointer
@@ -171,17 +176,96 @@ class Emulator:
 
         return [hundreds, tens, ones]
 
+    def _op_0x0(self, address):
+        pass
+
+    def _op_0x00e0(self):
+        self.screen.reset()
+
+    def _op_0x00ee(self):
+        self.memory_pointer = self.stack.pop()
+
+    def _op_0x1(self, address):
+        self.memory_pointer = address
+
+    def _op_0x2(self, address):
+        self._increase_memory_pointer()
+        self.stack.append(self.memory_pointer)
+        self.memory_pointer = address
+
+    def _op_0x3(self, register, byte):
+        if self.registers[register] == byte:
+            self._increase_memory_pointer()
+
+    def _op_0x4(self, x, number):
+        if self.registers[x] != number:
+            self._increase_memory_pointer()
+
+    def _op_0x5__0(self, x, y):
+        if self.registers[x] == self.registers[y]:
+            self._increase_memory_pointer()
+
+    def _op_0x6(self, x, number):
+        self.registers[x] = number
+
+    def _op_0x7(self, x, number):
+        self.registers[x] = (self.registers[x] + number) % 256
+
+    def _op_0x8__0(self, x, y):
+        self.registers[x] = self.registers[y]
+
+    def _op_0x8__1(self, x, y):
+        self.registers[x] = self.registers[x] | self.registers[y]
+
+    def _op_0x8__2(self, x, y):
+        self.registers[x] = self.registers[x] & self.registers[y]
+
+    def _op_0x8__3(self, x, y):
+        self.registers[x] = self.registers[x] ^ self.registers[y]
+
+    def _op_0x8__4(self, x, y):
+        value = self.registers[x] + self.registers[y]
+        self.registers[0xF] = value // 256
+        self.registers[x] = value % 256
+
+    def _op_0x8__5(self, x, y):
+        value = self.registers[x] - self.registers[y]
+        self.registers[0xF] = 1 if value >= 0 else 0
+        self.registers[x] = value % 256
+
+    def _op_0x8__6(self, x, y):
+        # On some modern interpreters, VX is shifted instead, while VY is ignored.
+        '''self.registers[0xF] = self.registers[y] & 0b1
+        self.registers[x] = (self.registers[y] > 1)'''
+        self.registers[0xF] = self.registers[x] & 0b1
+        self.registers[x] = (self.registers[x] > 1)
+
+    def _op_0x8__7(self, x, y):
+        value = self.registers[y] - self.registers[x]
+        self.registers[x] = value % 256
+        self.registers[0xF] = 0 if value < 0 else 1
+
+    def _op_0x8__e(self, x, y):
+        # On some modern interpreters, VX is shifted instead, while VY is ignored.
+        '''self.registers[0xF] = self.registers[y] & (0b1 < 7)
+        self.registers[x] = (self.registers[y] < 1)'''
+        self.registers[0xF] = self.registers[x] & (0b1 < 7)
+        self.registers[x] = (self.registers[x] < 1)
+
+    def _op_0x9__0(self, x, y):
+        if self.registers[x] != self.registers[y]:
+            self._increase_memory_pointer()
+
     def _op_0xa(self, address):
         if address < 0 or address > self.memory.memory_size:
             raise ImpossibleOperationException()
         self.register_i = address
 
+    def _op_0xb(self, address):
+        self.memory_pointer += address
+
     def _op_0xc(self, register, byte):
         self.registers[register] = random.randint(0, 0xFF) & byte
-
-    def _op_0x3(self, register, byte):
-        if self.registers[register] == byte:
-            self._increase_memory_pointer()
 
     def _op_0xd(self, x, y, bytes_count):
         data = self.memory.read(self.register_i, bytes_count)
@@ -190,116 +274,12 @@ class Emulator:
         is_intersect = self.screen.draw_sprite(start_x, start_y, data)
         self.registers[0xF] = is_intersect
 
-    def _op_0x7(self, x, number):
-        self.registers[x] = (self.registers[x] + number) % 256
-
-    def _op_0x1(self, address):
-        self.memory_pointer = address
-
-    def _op_0x6(self, x, number):
-        self.registers[x] = number
-
-    def _op_0x8__0(self, x, y):
-        self.registers[x] = self.registers[y]
-
-    def _op_0x2(self, address):
-        self._increase_memory_pointer()
-        self.stack.append(self.memory_pointer)
-        self.memory_pointer = address
-
     def _op_0xf_1e(self, x):
         self.register_i += self.registers[x]
-
-    def _op_0xf_0a(self, x):
-        if not self.is_waiting_mode or self.pressed_button is None:
-            self.pressed_button = None
-            self.is_waiting_mode = True
-            return
-        self.registers[x] = self.pressed_button
-        self.is_waiting_mode = False
-
-    def _op_0xf_55(self, x):
-        data = bytearray(x + 1)
-        for i in range(x + 1):
-            data[i] = self.registers[i]
-        self.memory.load_data(self.register_i, data)
-
-    def _op_0x4(self, x, number):
-        if self.registers[x] != number:
-            self._increase_memory_pointer()
-
-    def _op_0xf_65(self, x):
-        data = self.memory.read(self.register_i, x + 1)
-
-        for i in range(x + 1):
-            self.registers[i] = data[i]
-
-    def _op_0x8__2(self, x, y):
-        self.registers[x] = self.registers[x] & self.registers[y]
-
-    def _op_0x8__5(self, x, y):
-        value = self.registers[x] - self.registers[y]
-        self.registers[0xF] = 1 if value >= 0 else 0
-        self.registers[x] = value % 256
-
-    def _op_0x00ee(self):
-        self.memory_pointer = self.stack.pop()
-
-    def _op_0x0(self, address):
-        pass
-
-    def _op_0x00e0(self):
-        self.screen.reset()
-
-    def _op_0x8__4(self, x, y):
-        value = self.registers[x] + self.registers[y]
-        self.registers[0xF] = value // 256
-        self.registers[x] = value % 256
-
-    def _op_0xf_33(self, x):
-        bcd_format = Emulator.get_byte_in_bcd_format(self.registers[x])
-
-        for i in range(len(bcd_format)):
-            self.memory.write_byte(self.register_i + i, bcd_format[i])
 
     def _op_0xe_a1(self, x):
         if self.pressed_button != self.registers[x]:
             self._increase_memory_pointer()
-
-    def _op_0xf_29(self, x):
-        self.register_i = self.registers[x] * 5
-
-    def _op_0x8__3(self, x, y):
-        self.registers[x] = self.registers[x] ^ self.registers[y]
-
-    def _op_0x5__0(self, x, y):
-        if self.registers[x] == self.registers[y]:
-            self._increase_memory_pointer()
-
-    def _op_0x8__1(self, x, y):
-        self.registers[x] = self.registers[x] | self.registers[y]
-
-    def _op_0x8__6(self, x, y):
-        # On some modern interpreters, VX is shifted instead, while VY is ignored.
-        self.registers[0xF] = self.registers[y] & 0b1
-        self.registers[x] = (self.registers[y] > 1)
-
-    def _op_0x8__e(self, x, y):
-        # On some modern interpreters, VX is shifted instead, while VY is ignored.
-        self.registers[0xF] = self.registers[y] & (0b1 < 7)
-        self.registers[x] = (self.registers[y] < 1)
-
-    def _op_0x8__7(self, x, y):
-        value = self.registers[y] - self.registers[x]
-        self.registers[x] = value % 256
-        self.registers[0xF] = 0 if value < 0 else 1
-
-    def _op_0x9__0(self, x, y):
-        if self.registers[x] != self.registers[y]:
-            self._increase_memory_pointer()
-
-    def _op_0xb(self, address):
-        self.memory_pointer += address
 
     def _op_0xe_9e(self, x):
         if self.pressed_button == self.registers[x]:
@@ -308,8 +288,43 @@ class Emulator:
     def _op_0xf_07(self, x):
         self.registers[x] = self.delay_timer
 
+    def _op_0xf_0a(self, x):
+        '''if not self.is_waiting_mode or self.pressed_button is None:
+            self.pressed_button = None
+            self.is_waiting_mode = True
+            return
+        self.registers[x] = self.pressed_button
+        self.is_waiting_mode = False'''
+        if self.pressed_button is None:
+            self.is_waiting_mode = True
+            return
+        self.registers[x] = self.pressed_button
+        self.pressed_button = None
+        self.is_waiting_mode = False
+
     def _op_0xf_15(self, x):
         self.delay_timer = self.registers[x]
 
     def _op_0xf_18(self, x):
         self.sound_timer = self.registers[x]
+
+    def _op_0xf_29(self, x):
+        self.register_i = self.registers[x] * 5
+
+    def _op_0xf_33(self, x):
+        bcd_format = Emulator.get_byte_in_bcd_format(self.registers[x])
+
+        for i in range(len(bcd_format)):
+            self.memory.write_byte(self.register_i + i, bcd_format[i])
+
+    def _op_0xf_55(self, x):
+        data = bytearray(x + 1)
+        for i in range(x + 1):
+            data[i] = self.registers[i]
+        self.memory.load_data(self.register_i, data)
+
+    def _op_0xf_65(self, x):
+        data = self.memory.read(self.register_i, x + 1)
+
+        for i in range(x + 1):
+            self.registers[i] = data[i]
