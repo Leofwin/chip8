@@ -13,6 +13,10 @@ class Memory:
         self.memory_size = 4096
         self._memory = bytearray(self.memory_size)
 
+    def reset(self):
+        for i in range(0x200, self.memory_size, 1):
+            self._memory[i] = 0
+
     def read_byte(self, address):
         if address < 0 or address >= self.memory_size:
             raise IncorrectAddressException()

@@ -58,6 +58,15 @@ class MemoryTest(unittest.TestCase):
         actual = self.memory.read(0x205, 0x212 - 0x205)
         self.assertEqual(expected, actual)
 
+    def test_reset__should_clear_program_part(self):
+        for i in range(0x200, 4096, 1):
+            self.memory.write_byte(i, i % 256)
+
+        self.memory.reset()
+
+        for i in range(0x200, 4096, 1):
+            self.assertEqual(0, self.memory.read_byte(i))
+
 
 if __name__ == '__main__':
     unittest.main()

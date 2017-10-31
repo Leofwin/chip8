@@ -70,7 +70,7 @@ class ScreenTest(unittest.TestCase):
 
         self.screen.set_value(x, y, value)
 
-        index = y * self.screen.height + x
+        index = y * self.screen.width + x
         self.assertEqual(value, self.screen._screen[index])
 
     def test_decode_byte_to_pixels__if_byte_less_than_zero__exception(self):
@@ -152,6 +152,19 @@ class ScreenTest(unittest.TestCase):
                     expected[y][x],
                     self.screen._screen[self.screen._get_index(x, y)]
                 )
+
+    def test_reset(self):
+        for y in range(self.screen.height):
+            for x in range(self.screen.width):
+                value = y * self.screen.width + x
+                self.screen.set_value(x, y, value % 2)
+
+        self.screen._screen = screen
+        self.screen.reset()
+
+        for y in range(self.screen.height):
+            for x in range(self.screen.width):
+                self.assertEqual(0, self.screen.get_value(x, y))
 
 
 if __name__ == '__main__':

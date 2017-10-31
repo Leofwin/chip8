@@ -3,3 +3,4 @@ log.log
 .idea/
 __pycache__/
 tests/resources/
+games/already_works/
