@@ -4,3 +4,4 @@ log.log
 __pycache__/
 tests/resources/
 games/already_works/
+help.txt

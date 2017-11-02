@@ -99,6 +99,12 @@ class Emulator:
         self.is_waiting_mode = False
         self.pressed_button = None
 
+    def degrease_timers_if_need(self):
+        if self.delay_timer > 0:
+            self.delay_timer -= 1
+        if self.sound_timer > 0:
+            self.sound_timer -= 1
+
     def _load_font_in_memory(self):
         for index, byte in enumerate(self.font):
             self.memory.write_byte(index, byte)
@@ -130,10 +136,6 @@ class Emulator:
 
         self.instructions[opcode](*args)
 
-        if self.delay_timer > 0:
-            self.delay_timer -= 1
-        if self.sound_timer > 0:
-            self.sound_timer -= 1
         # if not keypress waiting mode,
         # increase memory pointer to all commands except commands
         # which are changing memory pointer
@@ -193,8 +195,8 @@ class Emulator:
         self.stack.append(self.memory_pointer)
         self.memory_pointer = address
 
-    def _op_0x3(self, register, byte):
-        if self.registers[register] == byte:
+    def _op_0x3(self, x, byte):
+        if self.registers[x] == byte:
             self._increase_memory_pointer()
 
     def _op_0x4(self, x, number):
@@ -215,13 +217,13 @@ class Emulator:
         self.registers[x] = self.registers[y]
 
     def _op_0x8__1(self, x, y):
-        self.registers[x] = self.registers[x] | self.registers[y]
+        self.registers[x] |= self.registers[y]
 
     def _op_0x8__2(self, x, y):
-        self.registers[x] = self.registers[x] & self.registers[y]
+        self.registers[x] &= self.registers[y]
 
     def _op_0x8__3(self, x, y):
-        self.registers[x] = self.registers[x] ^ self.registers[y]
+        self.registers[x] ^= self.registers[y]
 
     def _op_0x8__4(self, x, y):
         value = self.registers[x] + self.registers[y]
@@ -234,11 +236,8 @@ class Emulator:
         self.registers[x] = value % 256
 
     def _op_0x8__6(self, x, y):
-        # On some modern interpreters, VX is shifted instead, while VY is ignored.
-        '''self.registers[0xF] = self.registers[y] & 0b1
-        self.registers[x] = (self.registers[y] > 1)'''
         self.registers[0xF] = self.registers[x] & 0b1
-        self.registers[x] = (self.registers[x] > 1)
+        self.registers[x] = (self.registers[x] >> 1)
 
     def _op_0x8__7(self, x, y):
         value = self.registers[y] - self.registers[x]
@@ -246,11 +245,8 @@ class Emulator:
         self.registers[0xF] = 0 if value < 0 else 1
 
     def _op_0x8__e(self, x, y):
-        # On some modern interpreters, VX is shifted instead, while VY is ignored.
-        '''self.registers[0xF] = self.registers[y] & (0b1 < 7)
-        self.registers[x] = (self.registers[y] < 1)'''
-        self.registers[0xF] = self.registers[x] & (0b1 < 7)
-        self.registers[x] = (self.registers[x] < 1)
+        self.registers[0xF] = (self.registers[x] & (0b1 << 7)) >> 7
+        self.registers[x] = (self.registers[x] << 1)
 
     def _op_0x9__0(self, x, y):
         if self.registers[x] != self.registers[y]:
@@ -262,7 +258,7 @@ class Emulator:
         self.register_i = address
 
     def _op_0xb(self, address):
-        self.memory_pointer += address
+        self.memory_pointer = address + self.registers[0]
 
     def _op_0xc(self, register, byte):
         self.registers[register] = random.randint(0, 0xFF) & byte
@@ -274,27 +270,18 @@ class Emulator:
         is_intersect = self.screen.draw_sprite(start_x, start_y, data)
         self.registers[0xF] = is_intersect
 
-    def _op_0xf_1e(self, x):
-        self.register_i += self.registers[x]
+    def _op_0xe_9e(self, x):
+        if self.pressed_button == self.registers[x]:
+            self._increase_memory_pointer()
 
     def _op_0xe_a1(self, x):
         if self.pressed_button != self.registers[x]:
-            self._increase_memory_pointer()
-
-    def _op_0xe_9e(self, x):
-        if self.pressed_button == self.registers[x]:
             self._increase_memory_pointer()
 
     def _op_0xf_07(self, x):
         self.registers[x] = self.delay_timer
 
     def _op_0xf_0a(self, x):
-        '''if not self.is_waiting_mode or self.pressed_button is None:
-            self.pressed_button = None
-            self.is_waiting_mode = True
-            return
-        self.registers[x] = self.pressed_button
-        self.is_waiting_mode = False'''
         if self.pressed_button is None:
             self.is_waiting_mode = True
             return
@@ -307,6 +294,11 @@ class Emulator:
 
     def _op_0xf_18(self, x):
         self.sound_timer = self.registers[x]
+
+    def _op_0xf_1e(self, x):
+        value = self.register_i + self.registers[x]
+        self.register_i = (value) % 4096
+        self.registers[0xF] = value // 4096
 
     def _op_0xf_29(self, x):
         self.register_i = self.registers[x] * 5

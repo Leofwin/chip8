@@ -1,4 +1,5 @@
 import PyQt5.QtWidgets
+from PyQt5.QtMultimedia import QSound
 from PyQt5.QtGui import QKeySequence
 from PyQt5.QtCore import QBasicTimer
 import settings
@@ -15,7 +16,10 @@ class EmulatorWindow(PyQt5.QtWidgets.QMainWindow):
         self.generate_menu()
 
         self.timer = QBasicTimer()
-        self.timer.start(settings.frequency, self)
+        self.timer.start(1, self)
+        self.ticks = 0
+
+        self.beep = QSound(settings.sounds_folder + settings.beep)
 
         self.screen = Screen(parent_emulator.screen, self)
         self.setCentralWidget(self.screen)
@@ -42,8 +46,17 @@ class EmulatorWindow(PyQt5.QtWidgets.QMainWindow):
         menu_help.addAction(about_act)
 
     def timerEvent(self, e):
-        self.emulator.make_tact()
-        self.screen.update_pixels()
+        if self.ticks % settings.frequency == 0:
+            self.emulator.make_tact()
+            self.screen.update_pixels()
+
+        if self.ticks % settings.timer_frequency == 0:
+            if self.emulator.sound_timer > 0:
+                self.beep.play()
+
+            self.emulator.degrease_timers_if_need()
+
+        self.ticks = (self.ticks + 1) % max(settings.timer_frequency, settings.frequency)
 
     def keyPressEvent(self, e):
         key_code = e.key()
@@ -62,7 +75,6 @@ class EmulatorWindow(PyQt5.QtWidgets.QMainWindow):
             self.emulator.load_file_in_memory(name[0])
             self.screen.update_pixels()
         except Exception as e:
-            print(e)
             PyQt5.QtWidgets.QMessageBox.critical(
                 self,
                 "Не удалось загрузить файл",
@@ -70,7 +82,6 @@ class EmulatorWindow(PyQt5.QtWidgets.QMainWindow):
                 "Проверьте существование файла или"
                 "обратитесь к разработчику проекта",
                 PyQt5.QtWidgets.QMessageBox.Close)
-
 
     def show_help(self):
         PyQt5.QtWidgets.QMessageBox.information(
@@ -138,7 +149,7 @@ class Pixel(PyQt5.QtWidgets.QLabel):
 if __name__ == "__main__":
     app = PyQt5.QtWidgets.QApplication(sys.argv)
     chip_emulator = emulator.Emulator()
-    chip_emulator.load_file_in_memory(settings.games_folder + "MAZE")
+    chip_emulator.load_file_in_memory(settings.games_folder + "BLITZ")
 
     window = EmulatorWindow(chip_emulator)
     window.show()

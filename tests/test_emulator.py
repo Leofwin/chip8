@@ -435,7 +435,7 @@ class EmulatorTest(unittest.TestCase):
         y = 0xe
         value = 0b1001000
         self.chip_emulator.registers[y] = value
-        expected = value < 1
+        expected = value << 1
 
         self.chip_emulator._op_0x8__e(x, y)
 
@@ -521,7 +521,8 @@ class EmulatorTest(unittest.TestCase):
 
     def test_op_0xb(self):
         value = 325
-        expected = self.chip_emulator.memory_pointer + value
+        self.chip_emulator.registers[0] = 16
+        expected = self.chip_emulator.registers[0] + value
 
         self.chip_emulator._op_0xb(value)
 

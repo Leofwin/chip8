@@ -58,8 +58,10 @@ class Screen:
             pixels = Screen.decode_byte_to_pixels(byte)
 
             for x_offset, pixel in enumerate(pixels):
-                screen_x = (x + x_offset) % self.width
-                screen_y = (y + y_offset) % self.height
+                screen_x = x + x_offset
+                screen_y = y + y_offset
+                if screen_x >= self.width or screen_y >= self.height:
+                    continue
                 index = self._get_index(screen_x, screen_y)
                 collision |= bool(self._screen[index] & pixel)
                 self._screen[index] ^= pixel
