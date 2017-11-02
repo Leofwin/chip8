@@ -9,7 +9,7 @@ window_title = "CHIP-8"
 frequency = 1
 timer_frequency = 16
 pixel_size = 12
-help_msg = '''CHIP-8 Emulator (версия 0.3)
+help_msg = '''CHIP-8 Emulator (версия 0.5)
            Автор: Чуприлин Андрей <leofwin98@yandex.ru>'''
 
 # blue colors
