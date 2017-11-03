@@ -130,17 +130,17 @@ class Emulator:
 
         self.execute_instruction(opcode, args)
 
-    def execute_instruction(self, opcode, args):
-        if opcode not in self.instructions:
-            raise ImpossibleOperationException()
-
-        self.instructions[opcode](*args)
-
         # if not keypress waiting mode,
         # increase memory pointer to all commands except commands
         # which are changing memory pointer
         if not self.is_waiting_mode and opcode not in [0x1, 0xB, 0x2, 0x00ee]:
             self._increase_memory_pointer()
+
+    def execute_instruction(self, opcode, args):
+        if opcode not in self.instructions:
+            raise ImpossibleOperationException()
+
+        self.instructions[opcode](*args)
 
     @staticmethod
     def parse_word(word):
@@ -286,7 +286,6 @@ class Emulator:
             self.is_waiting_mode = True
             return
         self.registers[x] = self.pressed_button
-        self.pressed_button = None
         self.is_waiting_mode = False
 
     def _op_0xf_15(self, x):

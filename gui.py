@@ -1,4 +1,5 @@
 import PyQt5.QtWidgets
+from PyQt5.QtWidgets import QMainWindow
 from PyQt5.QtMultimedia import QSound
 from PyQt5.QtGui import QKeySequence
 from PyQt5.QtCore import QBasicTimer
@@ -7,7 +8,7 @@ import emulator
 import sys
 
 
-class EmulatorWindow(PyQt5.QtWidgets.QMainWindow):
+class EmulatorWindow(QMainWindow):
     def __init__(self, parent_emulator, parent=None):
         super().__init__(parent)
 
@@ -16,12 +17,18 @@ class EmulatorWindow(PyQt5.QtWidgets.QMainWindow):
         self.generate_menu()
 
         self.timer = QBasicTimer()
-        self.timer.start(1, self)
+        self.timer.start(0, self)
         self.ticks = 0
 
         self.beep = QSound(settings.sounds_folder + settings.beep)
-
         self.screen = Screen(parent_emulator.screen, self)
+
+        self.menuBar().setFixedSize(self.screen.width(), 22)
+        self.setFixedSize(
+            self.screen.width(),
+            self.screen.height() + self.menuBar().height()
+        )
+
         self.setCentralWidget(self.screen)
 
     def generate_menu(self):
@@ -37,11 +44,16 @@ class EmulatorWindow(PyQt5.QtWidgets.QMainWindow):
         about_act.setShortcut(QKeySequence("Ctrl+H"))
         about_act.triggered.connect(self.show_help)
 
+        pause_act = PyQt5.QtWidgets.QAction("Pause", self)
+        pause_act.setShortcut(QKeySequence("Ctrl+P"))
+        pause_act.triggered.connect(self.pause_or_continue)
+
         quit_act = PyQt5.QtWidgets.QAction("Quit", self)
         quit_act.setShortcut(QKeySequence("Ctrl+Q"))
         quit_act.triggered.connect(self.close)
 
         menu_file.addAction(open_act)
+        menu_file.addAction(pause_act)
         menu_file.addAction(quit_act)
         menu_help.addAction(about_act)
 
@@ -62,6 +74,12 @@ class EmulatorWindow(PyQt5.QtWidgets.QMainWindow):
         key_code = e.key()
         if key_code in settings.key_codes.keys():
             self.emulator.pressed_button = settings.key_codes[key_code]
+
+    def keyReleaseEvent(self, e):
+        key_code = e.key()
+        if key_code in settings.key_codes.keys() and \
+                        self.emulator.pressed_button == settings.key_codes[key_code]:
+            self.emulator.pressed_button = None
 
     def load_file(self):
         name = PyQt5.QtWidgets.QFileDialog.getOpenFileName(
@@ -89,8 +107,13 @@ class EmulatorWindow(PyQt5.QtWidgets.QMainWindow):
             PyQt5.QtWidgets.QMessageBox.Ok
         )
 
-    def restart(self):
-        pass
+    def pause_or_continue(self):
+        if self.timer.isActive():
+            self.timer.stop()
+            self.setWindowTitle(settings.window_title + " (Paused)")
+        else:
+            self.timer.start(0, self)
+            self.setWindowTitle(settings.window_title)
 
 
 class Screen(PyQt5.QtWidgets.QFrame):
@@ -149,7 +172,7 @@ class Pixel(PyQt5.QtWidgets.QLabel):
 if __name__ == "__main__":
     app = PyQt5.QtWidgets.QApplication(sys.argv)
     chip_emulator = emulator.Emulator()
-    chip_emulator.load_file_in_memory(settings.games_folder + "BLITZ")
+    chip_emulator.load_file_in_memory(settings.games_folder + "MAZE")
 
     window = EmulatorWindow(chip_emulator)
     window.show()
