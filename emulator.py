@@ -2,6 +2,7 @@ import random
 
 import memory
 import screen
+import estack
 
 
 class ImpossibleOperationException(Exception):
@@ -16,7 +17,6 @@ class Emulator:
 
         self.stack = []
 
-        self.stack_counter = 0
         self.memory_pointer = 0x200
         self.register_i = 0x200
 
@@ -90,7 +90,6 @@ class Emulator:
         self.registers = bytearray(16)
 
         self.stack = []
-        self.stack_counter = 0
         self.memory_pointer = 0x200
         self.register_i = 0x200
         self.delay_timer = 0
@@ -138,6 +137,7 @@ class Emulator:
 
     def execute_instruction(self, opcode, args):
         if opcode not in self.instructions:
+            print(opcode)
             raise ImpossibleOperationException()
 
         self.instructions[opcode](*args)
@@ -188,6 +188,8 @@ class Emulator:
         self.memory_pointer = self.stack.pop()
 
     def _op_0x1(self, address):
+        if address < 0 or address > 0xfff:
+            raise ImpossibleOperationException("Incorrect argument")
         self.memory_pointer = address
 
     def _op_0x2(self, address):
@@ -246,7 +248,8 @@ class Emulator:
 
     def _op_0x8__e(self, x, y):
         self.registers[0xF] = (self.registers[x] & (0b1 << 7)) >> 7
-        self.registers[x] = (self.registers[x] << 1)
+        value = (self.registers[x] << 1) % 256
+        self.registers[x] = value
 
     def _op_0x9__0(self, x, y):
         if self.registers[x] != self.registers[y]:
@@ -258,6 +261,9 @@ class Emulator:
         self.register_i = address
 
     def _op_0xb(self, address):
+        value = address + self.registers[0]
+        if value < 0 or value > 4096:
+            raise ImpossibleOperationException()
         self.memory_pointer = address + self.registers[0]
 
     def _op_0xc(self, register, byte):
@@ -296,7 +302,7 @@ class Emulator:
 
     def _op_0xf_1e(self, x):
         value = self.register_i + self.registers[x]
-        self.register_i = (value) % 4096
+        self.register_i = value % 4096
         self.registers[0xF] = value // 4096
 
     def _op_0xf_29(self, x):

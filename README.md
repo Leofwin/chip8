@@ -1,6 +1,5 @@
 # CHIP-8 Emulator
 Версия 0.5
-
 Автор: Чуприлин Андрей <leofwin98@yandex.ru>
 
 ## Описание

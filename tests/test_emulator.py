@@ -115,11 +115,11 @@ class EmulatorTest(unittest.TestCase):
         self.chip_emulator._op_0xa(address)
         self.assertEqual(address, self.chip_emulator.register_i)
 
-    '''def test_op_0xc__if_existing_address__change_selected_register_value(self):
-        # не совсем понятно как тестировать, ибо внутри метода выбирается случайное число
+    def test_op_0xc__if_existing_address__change_selected_register_value(self):
         address = 0x5
         self.chip_emulator._op_0xc(address, 0x15)
-        self.assertTrue(self.chip_emulator.registers[address] != 0)'''
+        self.assertTrue(self.chip_emulator.registers[address] >= 0)
+        self.assertTrue(self.chip_emulator.registers[address] <= 255)
 
     def test_op_0x3__if_values_are_same__increase_memory_pointer(self):
         address = 0x5
@@ -144,10 +144,19 @@ class EmulatorTest(unittest.TestCase):
         self.chip_emulator._op_0x7(register, number)
         self.assertEqual(prev_value + number, self.chip_emulator.registers[register])
 
-    def test_op_0x1(self):
-        address = 0xaf6
-        self.chip_emulator._op_0x1(address)
-        self.assertEqual(address, self.chip_emulator.memory_pointer)
+    def test_op_0x1__if_correct_address__change_memory_pointer(self):
+        addresses = [0xaf6, 0x000, 0x345, 0xefa]
+        for address in addresses:
+            self.chip_emulator._op_0x1(address)
+            self.assertEqual(address, self.chip_emulator.memory_pointer)
+
+    def test_op_0x1__if_address_less_than_zero__exception(self):
+        with self.assertRaises(emulator.ImpossibleOperationException):
+            self.chip_emulator._op_0x1(-200)
+
+    def test_op_0x1__if_address_more_than_max__exception(self):
+        with self.assertRaises(emulator.ImpossibleOperationException):
+            self.chip_emulator._op_0x1(0x1000)
 
     def test_op_0x6(self):
         register_address = 0xb
@@ -410,8 +419,8 @@ class EmulatorTest(unittest.TestCase):
         x = 0x4
         y = 0x7
         value = 0b10001000
-        self.chip_emulator.registers[y] = value
-        expected = value > 1
+        self.chip_emulator.registers[x] = value
+        expected = value >> 1
 
         self.chip_emulator._op_0x8__6(x, y)
 
@@ -422,8 +431,8 @@ class EmulatorTest(unittest.TestCase):
         x = 0x2
         y = 0x9
         value = 0b10111001
-        self.chip_emulator.registers[y] = value
-        expected = value > 1
+        self.chip_emulator.registers[x] = value
+        expected = value >> 1
 
         self.chip_emulator._op_0x8__6(x, y)
 
@@ -434,7 +443,7 @@ class EmulatorTest(unittest.TestCase):
         x = 0xa
         y = 0xe
         value = 0b1001000
-        self.chip_emulator.registers[y] = value
+        self.chip_emulator.registers[x] = value
         expected = value << 1
 
         self.chip_emulator._op_0x8__e(x, y)
@@ -445,9 +454,9 @@ class EmulatorTest(unittest.TestCase):
     def test_op_0x8__e___if_most_significant_bit_is_one__save_shift_and_raise_flag(self):
         x = 0x1
         y = 0x3
-        value = 0b10111001
-        self.chip_emulator.registers[y] = value
-        expected = value < 1
+        value = 0b11111001
+        self.chip_emulator.registers[x] = value
+        expected = (value << 1) % 256
 
         self.chip_emulator._op_0x8__e(x, y)
 
