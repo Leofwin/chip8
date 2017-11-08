@@ -14,15 +14,6 @@ class EmulatorTest(unittest.TestCase):
     def setUp(self):
         self.chip_emulator = emulator.Emulator()
 
-    def try_catch_exception_when_execute_operation(self, command, exception, *args):
-        try:
-            command(*args)
-            self.assertTrue(False)
-        except exception:
-            self.assertTrue(True)
-        except Exception:
-            self.assertTrue(False)
-
     def test_parse_word__if_0xA_0x2_0x1(self):
         words = [0xA123, 0x1456, 0x2abc]
         expected = [(0xA, [0x123]), (0x1, [0x456]), (0x2, [0xabc])]
@@ -71,12 +62,8 @@ class EmulatorTest(unittest.TestCase):
             self.assertEqual(expected[i][1], args)
 
     def test_load_file__not_exist_file__exception(self):
-        try:
+        with self.assertRaises(BlockingIOError):
             self.chip_emulator.load_file_in_memory("Ma1")
-        except BlockingIOError:
-            self.assertTrue(True)
-        except Exception:
-            self.assertTrue(False)
 
     def test_load_file__exist_file__fill_memory(self):
         file = "MAZE"
@@ -88,34 +75,23 @@ class EmulatorTest(unittest.TestCase):
 
     def test_load_file__file_more_than_max_size__exception(self):
         file = "_test_file"
-        try:
+        with self.assertRaises(memory.MemoryOverflowException):
             self.chip_emulator.load_file_in_memory(settings.games_folder + file)
-            self.assertTrue(False)
-        except memory.MemoryOverflowException:
-            self.assertTrue(True)
-        except Exception:
-            self.assertTrue(False)
 
     def test_op_0xa__if_negative_address__exception(self):
-        self.try_catch_exception_when_execute_operation(
-            self.chip_emulator._op_0xa,
-            emulator.ImpossibleOperationException,
-            -30
-        )
+        with self.assertRaises(emulator.ImpossibleOperationException):
+            self.chip_emulator._op_0xa(-30)
 
     def test_op_0xa__if_address_more_than_memory_size__exception(self):
-        self.try_catch_exception_when_execute_operation(
-            self.chip_emulator._op_0xa,
-            emulator.ImpossibleOperationException,
-            4097
-        )
+        with self.assertRaises(emulator.ImpossibleOperationException):
+            self.chip_emulator._op_0xa(4097)
 
-    def test_op_0xa__if_existing_address__change_register_address(self):
+    def test_op_0xa(self):
         address = 0x205
         self.chip_emulator._op_0xa(address)
         self.assertEqual(address, self.chip_emulator.register_i)
 
-    def test_op_0xc__if_existing_address__change_selected_register_value(self):
+    def test_op_0xc(self):
         address = 0x5
         self.chip_emulator._op_0xc(address, 0x15)
         self.assertTrue(self.chip_emulator.registers[address] >= 0)
@@ -137,12 +113,21 @@ class EmulatorTest(unittest.TestCase):
         self.chip_emulator._op_0x3(address, byte + 0x1)
         self.assertEqual(original_value, self.chip_emulator.memory_pointer)
 
-    def test_op_0x7(self):
+    def test_op_0x7__if_correct_value_and_sum_less_than_byte__add_sum(self):
         register = 0xa
         prev_value = self.chip_emulator.registers[register]
         number = 50
         self.chip_emulator._op_0x7(register, number)
         self.assertEqual(prev_value + number, self.chip_emulator.registers[register])
+
+    def test_op_0x7__if_correct_value_and_sum_more_than_byte__add_module_of_sum(self):
+        register = 0xa
+        prev_value = 255
+        self.chip_emulator.registers[register] = prev_value
+        number = 50
+        expected = (prev_value + number) % 256
+        self.chip_emulator._op_0x7(register, number)
+        self.assertEqual(expected, self.chip_emulator.registers[register])
 
     def test_op_0x1__if_correct_address__change_memory_pointer(self):
         addresses = [0xaf6, 0x000, 0x345, 0xefa]
@@ -150,15 +135,15 @@ class EmulatorTest(unittest.TestCase):
             self.chip_emulator._op_0x1(address)
             self.assertEqual(address, self.chip_emulator.memory_pointer)
 
-    def test_op_0x1__if_address_less_than_zero__exception(self):
-        with self.assertRaises(emulator.ImpossibleOperationException):
-            self.chip_emulator._op_0x1(-200)
+    def test_op_0x2__if_correct_address__put_in_stack_and_change_memory_pointer(self):
+        addresses = [0xaf6, 0x000, 0x345, 0xefa]
+        for address in addresses:
+            expected_stack_value = self.chip_emulator.memory_pointer + 0x2
+            self.chip_emulator._op_0x2(address)
+            self.assertEqual(expected_stack_value, self.chip_emulator.stack[-1])
+            self.assertEqual(address, self.chip_emulator.memory_pointer)
 
-    def test_op_0x1__if_address_more_than_max__exception(self):
-        with self.assertRaises(emulator.ImpossibleOperationException):
-            self.chip_emulator._op_0x1(0x1000)
-
-    def test_op_0x6(self):
+    def test_op_0x6__if_correct_value__change_vx_register_value(self):
         register_address = 0xb
         value = 0xdb
         self.chip_emulator._op_0x6(register_address, value)
@@ -172,7 +157,7 @@ class EmulatorTest(unittest.TestCase):
         self.chip_emulator._op_0x8__0(vx, vy)
         self.assertEqual(value, self.chip_emulator.registers[vy])
 
-    def test_op_0xf_1e(self):
+    def test_op_0xf_1e__if_less_than_memory_length(self):
         self.chip_emulator.register_i = 14
         register = 0xa
         self.chip_emulator.registers[register] = 0x15
@@ -180,6 +165,17 @@ class EmulatorTest(unittest.TestCase):
 
         self.chip_emulator._op_0xf_1e(0xa)
         self.assertEqual(expected, self.chip_emulator.register_i)
+        self.assertEqual(0, self.chip_emulator.registers[0xF])
+
+    def test_op_0xf_1e__if_more_than_memory_length(self):
+        self.chip_emulator.register_i = 4095
+        register = 0xa
+        self.chip_emulator.registers[register] = 0x15
+        expected = (self.chip_emulator.register_i + self.chip_emulator.registers[register]) % 4096
+
+        self.chip_emulator._op_0xf_1e(0xa)
+        self.assertEqual(expected, self.chip_emulator.register_i)
+        self.assertEqual(1, self.chip_emulator.registers[0xF])
 
     def test_op_0xf_55(self):
         x = 5
@@ -307,25 +303,16 @@ class EmulatorTest(unittest.TestCase):
         self.assertEqual(0, self.chip_emulator.registers[0xF])
 
     def test_get_byte_in_bcd_format__if_number_less_than_zero__exception(self):
-        self.try_catch_exception_when_execute_operation(
-            emulator.Emulator.get_byte_in_bcd_format,
-            ValueError,
-            -2
-        )
+        with self.assertRaises(ValueError):
+            emulator.Emulator.get_byte_in_bcd_format(-2)
 
     def test_get_byte_in_bcd_format__if_number_more_than_byte__exception(self):
-        self.try_catch_exception_when_execute_operation(
-            emulator.Emulator.get_byte_in_bcd_format,
-            ValueError,
-            1200
-        )
+        with self.assertRaises(ValueError):
+            emulator.Emulator.get_byte_in_bcd_format(1200)
 
     def test_get_byte_in_bcd_format__if_number_is_byte__exception(self):
-        self.try_catch_exception_when_execute_operation(
-            emulator.Emulator.get_byte_in_bcd_format,
-            ValueError,
-            256
-        )
+        with self.assertRaises(ValueError):
+            emulator.Emulator.get_byte_in_bcd_format(256)
 
     def test_get_byte_in_bcd_format__if_correct_number__return_bcd_format(self):
         numbers = [240, 115]
@@ -563,6 +550,36 @@ class EmulatorTest(unittest.TestCase):
         self.chip_emulator._op_0xf_18(x)
 
         self.assertEqual(expected, self.chip_emulator.sound_timer)
+
+    def test_op_0xd(self):
+        value = 0x256
+        self.chip_emulator.register_i = value
+        data = [0x16, 0xff, 0x5, 0x10]
+        for index, byte in enumerate(data):
+            self.chip_emulator.memory.write_byte(value + index, byte)
+
+        self.chip_emulator._op_0xd(0, 0, len(data))
+
+        for index, byte in enumerate(data):
+            for offset in range(8):
+                expected = (byte & (0b1 << (7 - offset))) >> (7 - offset)
+                i = self.chip_emulator.screen._get_index(offset, index)
+                self.assertEqual(
+                    expected,
+                    self.chip_emulator.screen._screen[i]
+                )
+
+        self.chip_emulator._op_0xd(0, 1, len(data))
+        self.assertEqual(0b1, self.chip_emulator.registers[0xF])
+
+    def test_op_0xf_29(self):
+        value = 0xe
+        x = 0xa
+        self.chip_emulator.registers[x] = value
+        expected = value * 5
+
+        self.chip_emulator._op_0xf_29(x)
+        self.assertEqual(expected, self.chip_emulator.register_i)
 
 
 if __name__ == '__main__':

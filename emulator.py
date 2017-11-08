@@ -2,7 +2,6 @@ import random
 
 import memory
 import screen
-import estack
 
 
 class ImpossibleOperationException(Exception):
@@ -24,6 +23,7 @@ class Emulator:
         self.sound_timer = 0
 
         self.is_waiting_mode = False
+        self.is_need_to_draw = False
         self.pressed_button = None
 
         self.font = [
@@ -129,6 +129,8 @@ class Emulator:
 
         self.execute_instruction(opcode, args)
 
+        self.is_need_to_draw = opcode in [0xD]
+
         # if not keypress waiting mode,
         # increase memory pointer to all commands except commands
         # which are changing memory pointer
@@ -188,8 +190,6 @@ class Emulator:
         self.memory_pointer = self.stack.pop()
 
     def _op_0x1(self, address):
-        if address < 0 or address > 0xfff:
-            raise ImpossibleOperationException("Incorrect argument")
         self.memory_pointer = address
 
     def _op_0x2(self, address):

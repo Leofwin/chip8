@@ -2,7 +2,7 @@ import PyQt5.QtWidgets
 from PyQt5.QtWidgets import QMainWindow
 from PyQt5.QtMultimedia import QSound
 from PyQt5.QtGui import QKeySequence
-from PyQt5.QtCore import QBasicTimer
+import threading
 import settings
 import emulator
 import sys
@@ -16,10 +16,6 @@ class EmulatorWindow(QMainWindow):
         self.emulator = parent_emulator
         self.generate_menu()
 
-        self.timer = QBasicTimer()
-        self.timer.start(0, self)
-        self.ticks = 0
-
         self.beep = QSound(settings.sounds_folder + settings.beep)
         self.screen = Screen(parent_emulator.screen, self)
 
@@ -30,6 +26,9 @@ class EmulatorWindow(QMainWindow):
         )
 
         self.setCentralWidget(self.screen)
+
+        th = threading.Thread(target=self.start_work)
+        th.start()
 
     def generate_menu(self):
         menubar = self.menuBar()
@@ -57,18 +56,11 @@ class EmulatorWindow(QMainWindow):
         menu_file.addAction(quit_act)
         menu_help.addAction(about_act)
 
-    def timerEvent(self, e):
-        if self.ticks % settings.frequency == 0:
+    def start_work(self):
+        while True:
             self.emulator.make_tact()
-            self.screen.update_pixels()
-
-        if self.ticks % settings.timer_frequency == 0:
-            if self.emulator.sound_timer > 0:
-                self.beep.play()
-
-            self.emulator.degrease_timers_if_need()
-
-        self.ticks = (self.ticks + 1) % max(settings.timer_frequency, settings.frequency)
+            if self.emulator.is_need_to_draw:
+                self.screen.update_pixels()
 
     def keyPressEvent(self, e):
         key_code = e.key()
