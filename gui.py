@@ -1,11 +1,23 @@
-import PyQt5.QtWidgets
-from PyQt5.QtWidgets import QMainWindow
-from PyQt5.QtMultimedia import QSound
-from PyQt5.QtGui import QKeySequence
-from PyQt5.QtCore import QBasicTimer
-import settings
-import emulator
 import sys
+import threading
+import time
+from contextlib import contextmanager
+
+import PyQt5.QtWidgets
+from PyQt5.QtGui import QKeySequence, QPainter, QColor, QPen
+from PyQt5.QtMultimedia import QSound
+from PyQt5.QtWidgets import QMainWindow
+
+import emulator
+import settings
+
+
+@contextmanager
+def painter(device):
+    painter = QPainter()
+    painter.begin(device)
+    yield painter
+    painter.end()
 
 
 class EmulatorWindow(QMainWindow):
@@ -18,10 +30,9 @@ class EmulatorWindow(QMainWindow):
 
         self.beep = QSound(settings.sounds_folder + settings.beep)
         self.screen = Screen(parent_emulator.screen, self)
-
-        self.timer = QBasicTimer()
-        self.timer.start(0, self)
-        self.ticks = 0
+        self.is_pause_thread = False
+        self.is_sound_timer_running = False
+        self.is_delay_timer_running = False
 
         self.menuBar().setFixedSize(self.screen.width(), 22)
         self.setFixedSize(
@@ -30,6 +41,37 @@ class EmulatorWindow(QMainWindow):
         )
 
         self.setCentralWidget(self.screen)
+        self.start_thread(self.start_emulator_work)
+
+    def start_thread(self, method):
+        th = threading.Thread(target=method)
+        th.setDaemon(True)
+        th.start()
+
+    def start_delay_timer_work(self):
+        self.is_delay_timer_running = True
+        while self.emulator.delay_timer > 0:
+            self.emulator.delay_timer -= 1
+            time.sleep(1 / settings.timer_frequency)
+        self.is_delay_timer_running = False
+
+    def start_sound_timer_work(self):
+        self.is_sound_timer_running = True
+        while self.emulator.sound_timer > 0:
+            self.emulator.sound_timer -= 1
+            time.sleep(1 / settings.timer_frequency)
+        self.is_sound_timer_running = False
+
+    def start_emulator_work(self):
+        while not self.is_pause_thread:
+            self.emulator.make_tact()
+            if self.emulator.is_need_to_draw:
+                time.sleep(0.001)  # works very fast without it
+                self.screen.update()
+            if self.emulator.delay_timer > 0 and not self.is_delay_timer_running:
+                self.start_thread(self.start_delay_timer_work)
+            if self.emulator.sound_timer > 0 and not self.is_sound_timer_running:
+                self.start_thread(self.start_sound_timer_work)
 
     def generate_menu(self):
         menubar = self.menuBar()
@@ -44,31 +86,13 @@ class EmulatorWindow(QMainWindow):
         about_act.setShortcut(QKeySequence("Ctrl+H"))
         about_act.triggered.connect(self.show_help)
 
-        pause_act = PyQt5.QtWidgets.QAction("Pause", self)
-        pause_act.setShortcut(QKeySequence("Ctrl+P"))
-        pause_act.triggered.connect(self.pause_or_continue)
-
         quit_act = PyQt5.QtWidgets.QAction("Quit", self)
         quit_act.setShortcut(QKeySequence("Ctrl+Q"))
         quit_act.triggered.connect(self.close)
 
         menu_file.addAction(open_act)
-        menu_file.addAction(pause_act)
         menu_file.addAction(quit_act)
         menu_help.addAction(about_act)
-
-    def timerEvent(self, e):
-        if self.ticks % settings.frequency == 0:
-            self.emulator.make_tact()
-            self.screen.update_pixels()
-
-        if self.ticks % settings.timer_frequency == 0:
-            if self.emulator.sound_timer > 0:
-                self.beep.play()
-
-            self.emulator.degrease_timers_if_need()
-
-        self.ticks = (self.ticks + 1) % max(settings.frequency, settings.timer_frequency)
 
     def keyPressEvent(self, e):
         key_code = e.key()
@@ -89,9 +113,12 @@ class EmulatorWindow(QMainWindow):
             return
 
         try:
+            self.is_pause_thread = True
             self.emulator.reset()
             self.emulator.load_file_in_memory(name[0])
-            self.screen.update_pixels()
+            self.screen.update()
+            self.is_pause_thread = False
+            self.start_thread()
         except Exception as e:
             PyQt5.QtWidgets.QMessageBox.critical(
                 self,
@@ -107,14 +134,6 @@ class EmulatorWindow(QMainWindow):
             PyQt5.QtWidgets.QMessageBox.Ok
         )
 
-    def pause_or_continue(self):
-        if self.timer.isActive():
-            self.timer.stop()
-            self.setWindowTitle(settings.window_title + " (Paused)")
-        else:
-            self.timer.start(0, self)
-            self.setWindowTitle(settings.window_title)
-
 
 class Screen(PyQt5.QtWidgets.QFrame):
     def __init__(self, screen_data, parent=None):
@@ -124,55 +143,33 @@ class Screen(PyQt5.QtWidgets.QFrame):
         height = screen_data.height * settings.pixel_size
         self.setFixedSize(width, height)
         self.screen_data = screen_data
-        self.points = []
-        for i in range(self.screen_data.width * self.screen_data.height):
-            self.points.append(None)
-        self.create_pixels()
+        self.update()
 
-    def _get_index(self, x, y):
-        return self.screen_data.width * y + x
-
-    def create_pixels(self):
+    def draw_pixels(self, qp):
+        qp.setPen(QPen(0))
+        active_color = QColor(settings.active_color)
+        background_color = QColor(settings.background_color)
         for y in range(self.screen_data.height):
             for x in range(self.screen_data.width):
-                index = self._get_index(x, y)
                 value = self.screen_data.get_value(x, y)
-                self.points[index] = Pixel(x, y, value, self)
+                color = active_color if value else background_color
+                qp.setBrush(QColor(color))
+                qp.drawRect(
+                    x * settings.pixel_size,
+                    y * settings.pixel_size,
+                    settings.pixel_size,
+                    settings.pixel_size
+                )
 
-    def update_pixels(self):
-        for y in range(self.screen_data.height):
-            for x in range(self.screen_data.width):
-                index = self._get_index(x, y)
-                value = self.screen_data.get_value(x, y)
-                if self.points[index].value != value:
-                    self.points[index].update_color(value)
-
-
-class Pixel(PyQt5.QtWidgets.QLabel):
-    def __init__(self, x, y, value, parent=None):
-        super().__init__(parent)
-        self.value = None
-
-        self.setGeometry(
-            x * settings.pixel_size,
-            y * settings.pixel_size,
-            settings.pixel_size,
-            settings.pixel_size
-        )
-        self.update_color(value)
-        self.show()
-
-    def update_color(self, value):
-        if value != self.value:
-            self.value = value
-            color = settings.active_color if value else settings.background_color
-            self.setStyleSheet("QLabel {background-color: %s;}" % color)
+    def paintEvent(self, e):
+        with painter(self) as qp:
+            self.draw_pixels(qp)
 
 
 if __name__ == "__main__":
     app = PyQt5.QtWidgets.QApplication(sys.argv)
     chip_emulator = emulator.Emulator()
-    chip_emulator.load_file_in_memory(settings.games_folder + "MAZE")
+    chip_emulator.load_file_in_memory(settings.games_folder + "INVADERS")
 
     window = EmulatorWindow(chip_emulator)
     window.show()

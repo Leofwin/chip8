@@ -6,7 +6,7 @@ beep = "beep.wav"
 
 window_title = "CHIP-8"
 frequency = 1
-timer_frequency = 16
+timer_frequency = 60
 pixel_size = 12
 help_msg = '''CHIP-8 Emulator (версия 0.5)
 Автор: Чуприлин Андрей <leofwin98@yandex.ru>'''

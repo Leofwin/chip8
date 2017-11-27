@@ -128,8 +128,7 @@ class Emulator:
         opcode, args = Emulator.parse_word(word)
 
         self.execute_instruction(opcode, args)
-
-        self.is_need_to_draw = opcode in [0xD]
+        self.is_need_to_draw = opcode is 0xD
 
         # if not keypress waiting mode,
         # increase memory pointer to all commands except commands
@@ -292,6 +291,7 @@ class Emulator:
             self.is_waiting_mode = True
             return
         self.registers[x] = self.pressed_button
+        self.pressed_button = None
         self.is_waiting_mode = False
 
     def _op_0xf_15(self, x):
