@@ -30,7 +30,7 @@ class EmulatorWindow(QMainWindow):
     def __init__(self, parent_emulator, parent=None):
         super().__init__(parent)
 
-        self.setWindowTitle(settings.window_title)
+        self.setWindowTitle(settings.window_title + " | Delay mode: activated")
         self.emulator = parent_emulator
         self.generate_menu()
 
@@ -52,6 +52,8 @@ class EmulatorWindow(QMainWindow):
 
     def change_delay_mode(self):
         self.is_need_to_make_delay = not self.is_need_to_make_delay
+        mode = "activated" if self.is_need_to_make_delay else "deactivated"
+        self.setWindowTitle(settings.window_title + " | Delay mode: {0}".format(mode))
 
     def start_delay_timer_work(self):
         self.is_delay_timer_running = True
