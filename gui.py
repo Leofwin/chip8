@@ -20,6 +20,12 @@ def painter(device):
     painter.end()
 
 
+def start_thread(method):
+    th = threading.Thread(target=method)
+    th.setDaemon(True)
+    th.start()
+
+
 class EmulatorWindow(QMainWindow):
     def __init__(self, parent_emulator, parent=None):
         super().__init__(parent)
@@ -33,6 +39,7 @@ class EmulatorWindow(QMainWindow):
         self.is_pause_thread = False
         self.is_sound_timer_running = False
         self.is_delay_timer_running = False
+        self.is_need_to_make_delay = True
 
         self.menuBar().setFixedSize(self.screen.width(), 22)
         self.setFixedSize(
@@ -41,23 +48,21 @@ class EmulatorWindow(QMainWindow):
         )
 
         self.setCentralWidget(self.screen)
-        self.start_thread(self.start_emulator_work)
+        start_thread(self.start_emulator_work)
 
-    def start_thread(self, method):
-        th = threading.Thread(target=method)
-        th.setDaemon(True)
-        th.start()
+    def change_delay_mode(self):
+        self.is_need_to_make_delay = not self.is_need_to_make_delay
 
     def start_delay_timer_work(self):
         self.is_delay_timer_running = True
-        while self.emulator.delay_timer > 0:
+        while not self.is_pause_thread and self.emulator.delay_timer > 0:
             self.emulator.delay_timer -= 1
             time.sleep(1 / settings.timer_frequency)
         self.is_delay_timer_running = False
 
     def start_sound_timer_work(self):
         self.is_sound_timer_running = True
-        while self.emulator.sound_timer > 0:
+        while not self.is_pause_thread and self.emulator.sound_timer > 0:
             self.emulator.sound_timer -= 1
             time.sleep(1 / settings.timer_frequency)
         self.is_sound_timer_running = False
@@ -66,16 +71,18 @@ class EmulatorWindow(QMainWindow):
         while not self.is_pause_thread:
             self.emulator.make_tact()
             if self.emulator.is_need_to_draw:
-                time.sleep(0.001)  # works very fast without it
+                if self.is_need_to_make_delay:
+                    time.sleep(0.001)
                 self.screen.update()
             if self.emulator.delay_timer > 0 and not self.is_delay_timer_running:
-                self.start_thread(self.start_delay_timer_work)
+                start_thread(self.start_delay_timer_work)
             if self.emulator.sound_timer > 0 and not self.is_sound_timer_running:
-                self.start_thread(self.start_sound_timer_work)
+                start_thread(self.start_sound_timer_work)
 
     def generate_menu(self):
         menubar = self.menuBar()
         menu_file = menubar.addMenu("&File")
+        menu_game = menubar.addMenu("&Game")
         menu_help = menubar.addMenu("&Help")
 
         open_act = PyQt5.QtWidgets.QAction("Open", self)
@@ -90,9 +97,14 @@ class EmulatorWindow(QMainWindow):
         quit_act.setShortcut(QKeySequence("Ctrl+Q"))
         quit_act.triggered.connect(self.close)
 
+        change_delay_mode_act = PyQt5.QtWidgets.QAction("Change delay mode", self)
+        change_delay_mode_act.setShortcut(QKeySequence("Ctrl+D"))
+        change_delay_mode_act.triggered.connect(self.change_delay_mode)
+
         menu_file.addAction(open_act)
         menu_file.addAction(quit_act)
         menu_help.addAction(about_act)
+        menu_game.addAction(change_delay_mode_act)
 
     def keyPressEvent(self, e):
         key_code = e.key()
@@ -114,11 +126,12 @@ class EmulatorWindow(QMainWindow):
 
         try:
             self.is_pause_thread = True
+            time.sleep(0.1)
             self.emulator.reset()
             self.emulator.load_file_in_memory(name[0])
             self.screen.update()
             self.is_pause_thread = False
-            self.start_thread()
+            start_thread(self.start_emulator_work)
         except Exception as e:
             PyQt5.QtWidgets.QMessageBox.critical(
                 self,
@@ -169,7 +182,7 @@ class Screen(PyQt5.QtWidgets.QFrame):
 if __name__ == "__main__":
     app = PyQt5.QtWidgets.QApplication(sys.argv)
     chip_emulator = emulator.Emulator()
-    chip_emulator.load_file_in_memory(settings.games_folder + "INVADERS")
+    chip_emulator.load_file_in_memory(settings.games_folder + "MAZE")
 
     window = EmulatorWindow(chip_emulator)
     window.show()
