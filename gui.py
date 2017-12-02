@@ -184,7 +184,8 @@ class Screen(PyQt5.QtWidgets.QFrame):
 if __name__ == "__main__":
     app = PyQt5.QtWidgets.QApplication(sys.argv)
     chip_emulator = emulator.Emulator()
-    chip_emulator.load_file_in_memory(settings.games_folder + "MAZE")
+    game = "MAZE" if len(sys.argv) < 2 else sys.argv[1]
+    chip_emulator.load_file_in_memory(settings.games_folder + game)
 
     window = EmulatorWindow(chip_emulator)
     window.show()

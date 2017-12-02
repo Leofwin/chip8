@@ -1,14 +1,14 @@
 import os
 
-games_folder = os.path.dirname(__file__) + """\\games\\"""
-sounds_folder = os.path.dirname(__file__) + """\\sounds\\"""
+games_folder = os.path.dirname(__file__) + """/games/"""
+sounds_folder = os.path.dirname(__file__) + """/sounds/"""
 beep = "beep.wav"
 
 window_title = "CHIP-8"
 frequency = 1
 timer_frequency = 60
 pixel_size = 12
-help_msg = '''CHIP-8 Emulator (версия 0.5)
+help_msg = '''CHIP-8 Emulator (версия 0.9)
 Автор: Чуприлин Андрей <leofwin98@yandex.ru>'''
 
 # blue colors
