@@ -41,12 +41,6 @@ class EmulatorWindow(QMainWindow):
         self.is_delay_timer_running = False
         self.is_need_to_make_delay = True
 
-        self.menuBar().setFixedSize(self.screen.width(), 22)
-        self.setFixedSize(
-            self.screen.width(),
-            self.screen.height() + self.menuBar().height()
-        )
-
         self.setCentralWidget(self.screen)
         start_thread(self.start_emulator_work)
 
