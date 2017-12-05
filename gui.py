@@ -181,11 +181,24 @@ class Screen(PyQt5.QtWidgets.QFrame):
             self.draw_pixels(qp)
 
 
+def print_help():
+    print("This program is a CHIP-8 emulator (v. 0.9).\n"
+          "To run emulator: write path to file as first argument.\n"
+          "Example: python gui.py /games/MAZE\n"
+          "Created by Leofwin <leofwin98@yandex.ru>")
+
+
 if __name__ == "__main__":
+    game = settings.games_folder + "MAZE"
+    if len(sys.argv) >= 2:
+        if sys.argv[1] == "--help" or sys.argv[1] == "-h":
+            print_help()
+            sys.exit(0)
+        game = sys.argv[1]
+
     app = PyQt5.QtWidgets.QApplication(sys.argv)
     chip_emulator = emulator.Emulator()
-    game = "MAZE" if len(sys.argv) < 2 else sys.argv[1]
-    chip_emulator.load_file_in_memory(settings.games_folder + game)
+    chip_emulator.load_file_in_memory(game)
 
     window = EmulatorWindow(chip_emulator)
     window.show()

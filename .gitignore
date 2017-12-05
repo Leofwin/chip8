@@ -5,3 +5,4 @@ __pycache__/
 tests/resources/
 games/already_works/
 help.txt
+chip8.zip
